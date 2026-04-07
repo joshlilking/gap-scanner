@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gap Screener</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#fff;font-family:-apple-system,Inter,sans-serif;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input{font-family:inherit;outline:none}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #1a1a1a}
+.header-left{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700}
+.header-left span.icon{font-size:22px;color:#aaa}
+.header-right{display:flex;gap:10px}
+.btn{padding:8px 18px;border-radius:10px;font-size:14px;font-weight:600;transition:all .2s}
+.btn-primary{background:#4ade80;color:#000}
+.btn-primary:hover{background:#22c55e}
+.btn-secondary{background:#1a1a1a;color:#aaa;border:1px solid #333}
+.btn-secondary:hover{background:#222;color:#fff}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-small{padding:6px 14px;font-size:13px;border-radius:8px}
+.btn .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Stats Row */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 24px}
+.stat-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:16px;padding:18px 20px;text-align:center}
+.stat-label{font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:700}
+.stat-value.green{color:#4ade80}
+.stat-value.red{color:#ef4444}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;padding:0 24px 16px;border-bottom:1px solid #1a1a1a}
+.tab{padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;color:#555;background:transparent;transition:all .2s}
+.tab:hover{color:#aaa}
+.tab.active{background:#1a1a1a;color:#fff}
+.tab .count{margin-left:6px;font-size:11px;background:#333;padding:2px 7px;border-radius:6px;vertical-align:middle}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px;padding:20px 24px}
+@media(max-width:500px){.grid{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(2,1fr)}}
+
+/* Setup Card */
+.card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:16px;padding:20px 22px;transition:border-color .2s}
+.card:hover{border-color:#333}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.card-symbol{font-size:22px;font-weight:800;letter-spacing:.5px}
+.card-gap{font-size:14px;font-weight:600;margin-left:10px}
+.card-gap.negative{color:#ef4444}
+.card-gap.positive{color:#4ade80}
+
+/* Badges */
+.badge{display:inline-block;padding:4px 12px;border-radius:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.badge-watching{background:rgba(250,204,21,.12);color:#facc15}
+.badge-active{background:rgba(59,130,246,.12);color:#3b82f6}
+.badge-won{background:rgba(74,222,128,.12);color:#4ade80}
+.badge-lost{background:rgba(239,68,68,.12);color:#ef4444}
+.badge-expired{background:rgba(100,100,100,.12);color:#777}
+
+.card-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.card-label{font-size:12px;color:#555}
+.card-val{font-size:14px;color:#aaa}
+.card-val.highlight{color:#fff;font-weight:600}
+.card-divider{border:none;border-top:1px solid #1a1a1a;margin:12px 0}
+.card-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.pnl-positive{color:#4ade80;font-weight:700}
+.pnl-negative{color:#ef4444;font-weight:700}
+
+/* Inline input */
+.inline-input{display:flex;gap:6px;margin-top:10px;align-items:center}
+.inline-input input{background:#111;border:1px solid #333;color:#fff;padding:6px 12px;border-radius:8px;width:120px;font-size:14px}
+.inline-input input::placeholder{color:#555}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:16px;width:95%;max-width:900px;max-height:90vh;overflow:auto;padding:24px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-size:20px;font-weight:700}
+.modal-close{background:none;color:#aaa;font-size:28px;line-height:1;padding:4px 8px}
+.modal-close:hover{color:#fff}
+.chart-container{position:relative;width:100%;background:#111;border-radius:12px;overflow:hidden}
+.chart-container canvas{display:block;width:100%;height:auto}
+.chart-legend{display:flex;gap:16px;padding:12px 0 0;flex-wrap:wrap}
+.chart-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#aaa}
+.chart-legend-item .swatch{width:14px;height:4px;border-radius:2px}
+
+/* Settings */
+.setting-group{display:flex;flex-direction:column;gap:4px}
+.setting-label{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px}
+.setting-input{background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:8px;font-size:14px;font-family:inherit;width:100%}
+.setting-input:focus{border-color:#4ade80;outline:none}
+.setting-input option{background:#111;color:#fff}
+
+/* Empty state */
+.empty{text-align:center;padding:60px 20px;color:#555;font-size:15px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid #333;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;z-index:2000;transform:translateY(80px);opacity:0;transition:all .3s}
+.toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left"><span class="icon">&#9776;</span> Gap Screener</div>
+  <div class="header-right">
+    <button class="btn btn-secondary btn-small" onclick="toggleSettings()">Settings</button>
+    <button class="btn btn-secondary btn-small" onclick="downloadCSV()">Download CSV</button>
+    <button class="btn btn-primary" id="scanBtn" onclick="triggerScan()">Scan Now</button>
+    <a href="https://sharky.network" class="btn btn-secondary">&larr; Dashboard</a>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div id="settingsPanel" style="display:none;background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:20px 24px;">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;max-width:1200px;">
+    <div class="setting-group">
+      <label class="setting-label">Min Gap %</label>
+      <input type="number" class="setting-input" id="sMinGap" step="0.5" value="5">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Max Gap %</label>
+      <input type="number" class="setting-input" id="sMaxGap" step="1" value="50">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Min Price ($)</label>
+      <input type="number" class="setting-input" id="sMinPrice" step="0.5" value="1">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Max Price ($)</label>
+      <input type="number" class="setting-input" id="sMaxPrice" step="1" value="0" placeholder="0 = no limit">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Min Market Cap ($M)</label>
+      <select class="setting-input" id="sMinMcap">
+        <option value="0">Any</option>
+        <option value="50">Micro ($50M+)</option>
+        <option value="300">Small ($300M+)</option>
+        <option value="2000">Mid ($2B+)</option>
+        <option value="10000">Large ($10B+)</option>
+        <option value="200000">Mega ($200B+)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Max Market Cap ($M)</label>
+      <select class="setting-input" id="sMaxMcap">
+        <option value="0">Any</option>
+        <option value="300">Micro (&lt;$300M)</option>
+        <option value="2000">Small (&lt;$2B)</option>
+        <option value="10000">Mid (&lt;$10B)</option>
+        <option value="200000">Large (&lt;$200B)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Min Avg Volume</label>
+      <select class="setting-input" id="sMinVol">
+        <option value="0">Any</option>
+        <option value="50000">50K+</option>
+        <option value="100000">100K+</option>
+        <option value="500000">500K+</option>
+        <option value="1000000">1M+</option>
+        <option value="5000000">5M+</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Lookback Days</label>
+      <input type="number" class="setting-input" id="sLookback" step="1" value="30">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Expire Days</label>
+      <input type="number" class="setting-input" id="sExpire" step="1" value="60">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Trail Step (%)</label>
+      <input type="number" class="setting-input" id="sTrailStep" step="1" value="8">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Trail SL Raise (%)</label>
+      <input type="number" class="setting-input" id="sTrailRaise" step="1" value="3">
+    </div>
+  </div>
+  <div style="margin-top:14px;display:flex;gap:10px;">
+    <button class="btn btn-primary btn-small" onclick="saveSettings()">Save Settings</button>
+    <button class="btn btn-secondary btn-small" onclick="toggleSettings()">Close</button>
+    <button class="btn btn-danger btn-small" style="margin-left:auto;" onclick="clearSetups()">Clear All Setups</button>
+  </div>
+</div>
+
+<div class="stats-row" id="statsRow">
+  <div class="stat-card"><div class="stat-label">Watching</div><div class="stat-value" id="statWatching">--</div></div>
+  <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" id="statActive">--</div></div>
+  <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value green" id="statWinRate">--%</div></div>
+  <div class="stat-card"><div class="stat-label">Total P&amp;L</div><div class="stat-value" id="statPnl">--</div></div>
+</div>
+
+<div class="tabs" id="tabBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+  <button class="tab active" data-tab="all">All<span class="count" id="cntAll">0</span></button>
+  <button class="tab" data-tab="watching">Watching<span class="count" id="cntWatching">0</span></button>
+  <button class="tab" data-tab="active">Active<span class="count" id="cntActive">0</span></button>
+  <button class="tab" data-tab="completed">Completed<span class="count" id="cntCompleted">0</span></button>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+    <label style="color:#888;font-size:13px;">Sort:</label>
+    <select id="sortSelect" onchange="applySort()" style="background:#111;color:#fff;border:1px solid #333;border-radius:6px;padding:5px 10px;font-size:13px;cursor:pointer;">
+      <option value="gap_asc">Biggest Gap First</option>
+      <option value="gap_desc">Smallest Gap First</option>
+      <option value="date_desc">Newest First</option>
+      <option value="date_asc">Oldest First</option>
+      <option value="rr_desc">Best R/R First</option>
+      <option value="symbol_asc">Symbol A-Z</option>
+    </select>
+  </div>
+</div>
+
+<div class="grid" id="cardGrid"></div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Chart</div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="chart-container">
+      <canvas id="chartCanvas" width="1700" height="800"></canvas>
+    </div>
+    <div class="chart-legend">
+      <div class="chart-legend-item"><span class="swatch" style="background:#4ade80"></span>Up candle</div>
+      <div class="chart-legend-item"><span class="swatch" style="background:#ef4444"></span>Down candle</div>
+      <div class="chart-legend-item"><span class="swatch" style="background:rgba(139,92,246,.25)"></span>Gap zone</div>
+      <div class="chart-legend-item"><span class="swatch" style="background:#fff"></span>Entry (dashed)</div>
+      <div class="chart-legend-item"><span class="swatch" style="background:#ef4444"></span>SL (dashed)</div>
+      <div class="chart-legend-item"><span class="swatch" style="background:#4ade80"></span>TP (dashed)</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let allSetups = [];
+let currentTab = 'all';
+let refreshTimer = null;
+
+// ── Bootstrap ──
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  loadSettings();
+  loadData();
+  refreshTimer = setInterval(loadData, 60000);
+});
+
+// ── Settings ──
+function toggleSettings() {
+  const p = el('settingsPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/gaps/settings');
+    if (!res.ok) return;
+    const s = await res.json();
+    el('sMinGap').value = s.min_gap_pct ?? 5;
+    el('sMaxGap').value = s.max_gap_pct ?? 50;
+    el('sMinPrice').value = s.min_price ?? 1;
+    el('sMaxPrice').value = s.max_price ?? 0;
+    el('sMinMcap').value = s.min_market_cap ?? 0;
+    el('sMaxMcap').value = s.max_market_cap ?? 0;
+    el('sMinVol').value = s.min_volume ?? 0;
+    el('sLookback').value = s.lookback_days ?? 30;
+    el('sExpire').value = s.expire_days ?? 60;
+    el('sTrailStep').value = s.trailing_gain_step ?? 8;
+    el('sTrailRaise').value = s.trailing_sl_raise ?? 3;
+  } catch(e) { console.error('Settings load error', e); }
+}
+
+async function saveSettings() {
+  const body = {
+    min_gap_pct: parseFloat(el('sMinGap').value),
+    max_gap_pct: parseFloat(el('sMaxGap').value),
+    min_price: parseFloat(el('sMinPrice').value),
+    max_price: parseFloat(el('sMaxPrice').value),
+    min_market_cap: parseInt(el('sMinMcap').value),
+    max_market_cap: parseInt(el('sMaxMcap').value),
+    min_volume: parseInt(el('sMinVol').value),
+    lookback_days: parseInt(el('sLookback').value),
+    expire_days: parseInt(el('sExpire').value),
+    trailing_gain_step: parseFloat(el('sTrailStep').value),
+    trailing_sl_raise: parseFloat(el('sTrailRaise').value),
+  };
+  try {
+    const res = await fetch('/api/gaps/settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (res.ok) toast('Settings saved');
+    else toast('Failed to save settings');
+  } catch(e) { toast('Error saving settings'); }
+}
+
+function downloadCSV() {
+  window.location.href = '/api/gaps/download';
+}
+
+async function clearSetups() {
+  if (!confirm('Clear ALL setups? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/gaps/clear', {method:'POST'});
+    if (res.ok) { toast('All setups cleared'); loadData(); }
+  } catch(e) { toast('Error clearing setups'); }
+}
+
+// ── Tabs ──
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      currentTab = t.dataset.tab;
+      renderCards();
+    });
+  });
+}
+
+// ── Data fetching ──
+async function loadData() {
+  try {
+    const [setupsRes, statsRes, pricesRes] = await Promise.all([
+      fetch('/api/gaps'), fetch('/api/gaps/stats'), fetch('/api/gaps/prices')
+    ]);
+    let prices = {};
+    if (pricesRes && pricesRes.ok) {
+      prices = await pricesRes.json();
+    }
+    if (setupsRes.ok) {
+      allSetups = await setupsRes.json();
+      // Merge live prices
+      for (const s of allSetups) {
+        if (prices[s.symbol] != null) s.current_price = prices[s.symbol];
+      }
+      sortSetups();
+    }
+    if (statsRes.ok) {
+      const s = await statsRes.json();
+      el('statWatching').textContent = s.watching ?? 0;
+      el('statActive').textContent = s.active ?? 0;
+      const wr = s.win_rate_pct ?? s.win_rate ?? 0;
+      const wrEl = el('statWinRate');
+      wrEl.textContent = wr.toFixed(0) + '%';
+      wrEl.className = 'stat-value ' + (wr >= 50 ? 'green' : 'red');
+      const pnl = s.total_pnl_pct ?? s.total_pnl ?? 0;
+      const pnlEl = el('statPnl');
+      pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
+      pnlEl.className = 'stat-value ' + (pnl >= 0 ? 'green' : 'red');
+    }
+    updateCounts();
+    renderCards();
+  } catch (e) {
+    console.error('Load error', e);
+    renderDemoData();
+  }
+}
+
+function renderDemoData() {
+  allSetups = [
+    {symbol:'AAPL',gap_pct:-8.5,status:'watching',trigger:171.80,sl:168.50,tp:185.20,rr:3.2,gap_date:'2026-04-03',current_price:170.25},
+    {symbol:'TSLA',gap_pct:-12.3,status:'active',trigger:242.00,sl:235.00,tp:268.00,rr:2.8,gap_date:'2026-04-01',current_price:248.60,entry_price:243.50,entry_date:'2026-04-04',trailing_sl:240.00},
+    {symbol:'NVDA',gap_pct:-6.2,status:'completed',result:'win',trigger:820.00,sl:805.00,tp:860.00,rr:2.7,gap_date:'2026-03-28',entry_price:822.00,exit_price:858.50,pnl_pct:4.44},
+    {symbol:'META',gap_pct:-9.8,status:'completed',result:'loss',trigger:505.00,sl:495.00,tp:535.00,rr:3.0,gap_date:'2026-03-25',entry_price:506.00,exit_price:494.50,pnl_pct:-2.27},
+    {symbol:'MSFT',gap_pct:-5.1,status:'watching',trigger:412.00,sl:406.00,tp:428.00,rr:2.7,gap_date:'2026-04-02',current_price:409.30},
+    {symbol:'AMZN',gap_pct:-7.4,status:'expired',trigger:186.50,sl:182.00,tp:198.00,rr:2.6,gap_date:'2026-03-15'},
+    {symbol:'GOOG',gap_pct:-4.9,status:'watching',trigger:165.00,sl:161.50,tp:174.00,rr:2.6,gap_date:'2026-04-04',current_price:163.80},
+  ];
+  el('statWatching').textContent = '3';
+  el('statActive').textContent = '1';
+  el('statWinRate').textContent = '50%';
+  el('statWinRate').className = 'stat-value green';
+  el('statPnl').textContent = '+2.17%';
+  el('statPnl').className = 'stat-value green';
+  updateCounts();
+  renderCards();
+}
+
+function updateCounts() {
+  const w = allSetups.filter(s => s.status === 'watching').length;
+  const a = allSetups.filter(s => s.status === 'active').length;
+  const c = allSetups.filter(s => s.status === 'completed' || s.status === 'expired').length;
+  el('cntAll').textContent = allSetups.length;
+  el('cntWatching').textContent = w;
+  el('cntActive').textContent = a;
+  el('cntCompleted').textContent = c;
+}
+
+// ── Render Cards ──
+function sortSetups() {
+  const val = el('sortSelect').value;
+  switch(val) {
+    case 'gap_asc': allSetups.sort((a,b) => (a.gap_pct||0) - (b.gap_pct||0)); break;
+    case 'gap_desc': allSetups.sort((a,b) => (b.gap_pct||0) - (a.gap_pct||0)); break;
+    case 'date_desc': allSetups.sort((a,b) => new Date(b.gap_date||0) - new Date(a.gap_date||0)); break;
+    case 'date_asc': allSetups.sort((a,b) => new Date(a.gap_date||0) - new Date(b.gap_date||0)); break;
+    case 'rr_desc': allSetups.sort((a,b) => (b.rr_ratio||0) - (a.rr_ratio||0)); break;
+    case 'symbol_asc': allSetups.sort((a,b) => (a.symbol||'').localeCompare(b.symbol||'')); break;
+  }
+}
+function applySort() { sortSetups(); renderCards(); }
+
+function renderCards() {
+  const grid = el('cardGrid');
+  let items = allSetups;
+  if (currentTab === 'watching') items = items.filter(s => s.status === 'watching');
+  else if (currentTab === 'active') items = items.filter(s => s.status === 'active');
+  else if (currentTab === 'completed') items = items.filter(s => s.status === 'completed' || s.status === 'expired');
+
+  if (!items.length) {
+    grid.innerHTML = '<div class="empty">No setups found for this filter.</div>';
+    return;
+  }
+
+  grid.innerHTML = items.map(s => cardHTML(s)).join('');
+}
+
+function cardHTML(s) {
+  const gapClass = s.gap_pct < 0 ? 'negative' : 'positive';
+  const gapSign = s.gap_pct < 0 ? '' : '+';
+  const badge = badgeHTML(s);
+  const gapDate = s.gap_date ? formatDate(s.gap_date) : '--';
+
+  const trigger = s.trigger_price || s.trigger || 0;
+  const sl = s.sl_price || s.sl || 0;
+  const tp = s.tp_price || s.tp || 0;
+  const rr = s.rr_ratio || s.rr || 0;
+  const curPrice = s.current_price;
+
+  let body = `
+    <div class="card-row"><span class="card-label">Trigger</span><span class="card-val highlight">$${fmt(trigger)} (close above)</span></div>
+    <div class="card-row"><span class="card-label">SL / TP</span><span class="card-val"><span style="color:#ef4444">$${fmt(sl)}</span> &nbsp;/&nbsp; <span style="color:#4ade80">$${fmt(tp)}</span></span></div>
+    <div class="card-row"><span class="card-label">R/R</span><span class="card-val">${rr > 0 ? rr.toFixed(1)+':1' : 'N/A'}</span></div>
+    <div class="card-row"><span class="card-label">Gap Date</span><span class="card-val">${gapDate}</span></div>`;
+
+  if (curPrice != null && s.status !== 'completed') {
+    const vs = trigger > 0 ? ((curPrice - trigger) / trigger * 100) : 0;
+    const vsCls = curPrice >= trigger ? 'pnl-positive' : 'pnl-negative';
+    body += `<div class="card-row"><span class="card-label">Current</span><span class="card-val highlight">$${fmt(curPrice)} <span class="${vsCls}" style="font-size:12px;margin-left:6px">(${vs>=0?'+':''}${vs.toFixed(1)}% vs trigger)</span></span></div>`;
+  }
+
+  if (s.status === 'active') {
+    body += '<hr class="card-divider">';
+    body += `<div class="card-row"><span class="card-label">Entry</span><span class="card-val highlight">$${fmt(s.entry_price)} on ${formatDate(s.entry_date)}</span></div>`;
+    if (s.current_price != null && s.entry_price) {
+      const pnl = ((s.current_price - s.entry_price) / s.entry_price * 100);
+      const pnlCls = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+      body += `<div class="card-row"><span class="card-label">Current P&L</span><span class="card-val ${pnlCls}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%</span></div>`;
+    }
+    if (s.trailing_sl != null) {
+      body += `<div class="card-row"><span class="card-label">Trailing SL</span><span class="card-val" style="color:#facc15">$${fmt(s.trailing_sl)}</span></div>`;
+    }
+  }
+
+  if (s.status === 'completed') {
+    body += '<hr class="card-divider">';
+    body += `<div class="card-row"><span class="card-label">Entry</span><span class="card-val">$${fmt(s.entry_price)}</span></div>`;
+    body += `<div class="card-row"><span class="card-label">Exit</span><span class="card-val">$${fmt(s.exit_price)}</span></div>`;
+    const pnlCls = (s.pnl_pct||0) >= 0 ? 'pnl-positive' : 'pnl-negative';
+    body += `<div class="card-row"><span class="card-label">P&L</span><span class="card-val ${pnlCls}">${(s.pnl_pct||0) >= 0 ? '+' : ''}${(s.pnl_pct||0).toFixed(2)}%</span></div>`;
+  }
+
+  // Actions
+  let actions = `<button class="btn btn-secondary btn-small" onclick="viewChart('${s.symbol}')">View Chart</button>`;
+  if (s.status === 'watching') {
+    actions += `<button class="btn btn-primary btn-small" onclick="showEntryInput('${s.symbol}', this)">Enter Trade</button>`;
+  }
+  if (s.status === 'active') {
+    actions += `<button class="btn btn-danger btn-small" onclick="showCloseInput('${s.symbol}', this)">Close Trade</button>`;
+  }
+
+  return `<div class="card" id="card-${s.symbol}">
+    <div class="card-header">
+      <div><span class="card-symbol">${s.symbol}</span><span class="card-gap ${gapClass}">${gapSign}${s.gap_pct.toFixed(1)}% gap</span></div>
+      ${badge}
+    </div>
+    ${body}
+    <div class="card-actions">${actions}</div>
+  </div>`;
+}
+
+function badgeHTML(s) {
+  if (s.status === 'watching') return '<span class="badge badge-watching">Watching</span>';
+  if (s.status === 'active') return '<span class="badge badge-active">Active</span>';
+  if (s.status === 'completed' && (s.pnl_pct || 0) >= 0) return '<span class="badge badge-won">Won</span>';
+  if (s.status === 'completed' && (s.pnl_pct || 0) < 0) return '<span class="badge badge-lost">Lost</span>';
+  if (s.status === 'expired') return '<span class="badge badge-expired">Expired</span>';
+  return '<span class="badge badge-watching">--</span>';
+}
+
+// ── Actions ──
+async function triggerScan() {
+  const btn = el('scanBtn');
+  btn.innerHTML = '<span class="spinner"></span>Starting scan...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/gaps/scan');
+    if (!res.ok) { toast('Scan failed to start'); btn.innerHTML = 'Scan Now'; btn.disabled = false; return; }
+    const data = await res.json();
+    if (data.status === 'running') { toast('Scan already in progress'); }
+    else { toast('Scan started (' + (data.tickers || '?') + ' tickers)'); }
+    // Poll for completion
+    const pollInterval = setInterval(async () => {
+      try {
+        const sr = await fetch('/api/gaps/scan/status');
+        const sd = await sr.json();
+        if (sd.status === 'running') {
+          btn.innerHTML = '<span class="spinner"></span>Scanning... (' + (sd.setups_so_far || 0) + ' found)';
+        } else {
+          clearInterval(pollInterval);
+          btn.innerHTML = 'Scan Now';
+          btn.disabled = false;
+          toast('Scan complete');
+          await loadData();
+        }
+      } catch(e) {
+        clearInterval(pollInterval);
+        btn.innerHTML = 'Scan Now';
+        btn.disabled = false;
+      }
+    }, 5000);
+  } catch (e) {
+    toast('Scan error');
+    btn.innerHTML = 'Scan Now';
+    btn.disabled = false;
+  }
+}
+
+function showEntryInput(symbol, btnEl) {
+  const container = btnEl.parentElement;
+  if (container.querySelector('.inline-input')) return;
+  const div = document.createElement('div');
+  div.className = 'inline-input';
+  div.innerHTML = `<input type="number" step="0.01" placeholder="Entry price" id="inp-${symbol}">
+    <button class="btn btn-primary btn-small" onclick="activateTrade('${symbol}')">Confirm</button>
+    <button class="btn btn-secondary btn-small" onclick="this.parentElement.remove()">Cancel</button>`;
+  container.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function showCloseInput(symbol, btnEl) {
+  const container = btnEl.parentElement;
+  if (container.querySelector('.inline-input')) return;
+  const div = document.createElement('div');
+  div.className = 'inline-input';
+  div.innerHTML = `<input type="number" step="0.01" placeholder="Exit price" id="inp-${symbol}">
+    <button class="btn btn-danger btn-small" onclick="closeTrade('${symbol}')">Confirm</button>
+    <button class="btn btn-secondary btn-small" onclick="this.parentElement.remove()">Cancel</button>`;
+  container.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+async function activateTrade(symbol) {
+  const price = parseFloat(el('inp-' + symbol)?.value);
+  if (!price || isNaN(price)) { toast('Enter a valid price'); return; }
+  try {
+    const res = await fetch(`/api/gaps/${symbol}/activate`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({entry_price: price})
+    });
+    if (res.ok) { toast(`${symbol} trade activated`); loadData(); }
+    else toast('Activation failed');
+  } catch (e) { toast('Error activating trade'); }
+}
+
+async function closeTrade(symbol) {
+  const price = parseFloat(el('inp-' + symbol)?.value);
+  if (!price || isNaN(price)) { toast('Enter a valid price'); return; }
+  try {
+    const res = await fetch(`/api/gaps/${symbol}/close`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({exit_price: price})
+    });
+    if (res.ok) { toast(`${symbol} trade closed`); loadData(); }
+    else toast('Close failed');
+  } catch (e) { toast('Error closing trade'); }
+}
+
+// ── Chart Modal ──
+async function viewChart(symbol) {
+  const overlay = el('modalOverlay');
+  el('modalTitle').textContent = symbol + ' — Daily Chart';
+  overlay.classList.add('open');
+
+  const setup = allSetups.find(s => s.symbol === symbol);
+  let ohlcv = null;
+  try {
+    const res = await fetch(`/api/gaps/chart/${symbol}`);
+    if (res.ok) ohlcv = await res.json();
+  } catch (e) {}
+
+  if (ohlcv && ohlcv.ohlcv) {
+    // API returns {symbol, ohlcv, setup}
+    const apiSetup = ohlcv.setup || setup;
+    ohlcv = ohlcv.ohlcv.map(b => ({date:b.date, o:b.open, h:b.high, l:b.low, c:b.close, v:b.volume}));
+    drawChart(ohlcv, {trigger: apiSetup?.trigger_price, sl: apiSetup?.sl_price, tp: apiSetup?.tp_price, entry_price: apiSetup?.entry_price});
+    return;
+  }
+  if (!ohlcv || !ohlcv.length) {
+    ohlcv = generateDemoOHLCV({trigger, sl, tp: setup?.tp_price || setup?.tp});
+  }
+  drawChart(ohlcv, {trigger: setup?.trigger_price || setup?.trigger, sl: setup?.sl_price || setup?.sl, tp: setup?.tp_price || setup?.tp, entry_price: setup?.entry_price});
+}
+
+function closeModal(e) {
+  if (e && e.target !== el('modalOverlay')) return;
+  el('modalOverlay').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') el('modalOverlay').classList.remove('open'); });
+
+function generateDemoOHLCV(setup) {
+  const bars = [];
+  const base = setup?.trigger || 170;
+  let price = base * 0.92;
+  const now = new Date();
+  for (let i = 59; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    const change = (Math.random() - 0.48) * base * 0.025;
+    const o = price;
+    const c = price + change;
+    const h = Math.max(o, c) + Math.random() * base * 0.008;
+    const l = Math.min(o, c) - Math.random() * base * 0.008;
+    const v = Math.floor(5e6 + Math.random() * 15e6);
+    bars.push({date: d.toISOString().slice(0,10), o:+o.toFixed(2), h:+h.toFixed(2), l:+l.toFixed(2), c:+c.toFixed(2), v});
+    price = c;
+  }
+  return bars;
+}
+
+function drawChart(bars, setup) {
+  const canvas = el('chartCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = 1700, H = 800;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = '100%';
+  canvas.style.height = 'auto';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = {top: 30, right: 70, bottom: 80, left: 10};
+  const chartW = W - pad.left - pad.right;
+  const priceH = H * 0.72;
+  const volH = H * 0.15;
+  const volTop = H - pad.bottom - volH;
+
+  // Price range
+  let pMin = Infinity, pMax = -Infinity, vMax = 0;
+  bars.forEach(b => { pMin = Math.min(pMin, b.l); pMax = Math.max(pMax, b.h); vMax = Math.max(vMax, b.v); });
+  const levels = [setup?.sl, setup?.tp, setup?.trigger].filter(Boolean);
+  levels.forEach(l => { pMin = Math.min(pMin, l); pMax = Math.max(pMax, l); });
+  const pPad = (pMax - pMin) * 0.08;
+  pMin -= pPad; pMax += pPad;
+
+  const xStep = chartW / bars.length;
+  const priceY = p => pad.top + priceH - ((p - pMin) / (pMax - pMin)) * priceH;
+  const barX = i => pad.left + i * xStep + xStep / 2;
+
+  // Gap zone shading
+  if (setup) {
+    const gapHigh = setup.trigger || 0;
+    const gapLow = setup.sl || 0;
+    if (gapHigh && gapLow) {
+      const y1 = priceY(gapHigh);
+      const y2 = priceY(gapLow);
+      ctx.fillStyle = 'rgba(139,92,246,0.08)';
+      ctx.fillRect(pad.left, Math.min(y1, y2), chartW, Math.abs(y2 - y1));
+      ctx.strokeStyle = 'rgba(139,92,246,0.25)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(pad.left, Math.min(y1, y2), chartW, Math.abs(y2 - y1));
+    }
+  }
+
+  // Grid lines
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 1;
+  const gridSteps = 6;
+  for (let i = 0; i <= gridSteps; i++) {
+    const p = pMin + (pMax - pMin) * (i / gridSteps);
+    const y = priceY(p);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.fillStyle = '#555';
+    ctx.font = '11px -apple-system,Inter,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('$' + p.toFixed(2), W - pad.right + 6, y + 4);
+  }
+
+  // Candles
+  const candleW = Math.max(1, xStep * 0.6);
+  bars.forEach((b, i) => {
+    const x = barX(i);
+    const up = b.c >= b.o;
+    ctx.strokeStyle = up ? '#4ade80' : '#ef4444';
+    ctx.fillStyle = up ? '#4ade80' : '#ef4444';
+
+    // Wick
+    ctx.beginPath();
+    ctx.moveTo(x, priceY(b.h));
+    ctx.lineTo(x, priceY(b.l));
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Body
+    const bodyTop = priceY(Math.max(b.o, b.c));
+    const bodyBot = priceY(Math.min(b.o, b.c));
+    const bodyH = Math.max(1, bodyBot - bodyTop);
+    if (up) {
+      ctx.fillRect(x - candleW / 2, bodyTop, candleW, bodyH);
+    } else {
+      ctx.fillRect(x - candleW / 2, bodyTop, candleW, bodyH);
+    }
+  });
+
+  // Volume bars
+  bars.forEach((b, i) => {
+    const x = barX(i);
+    const up = b.c >= b.o;
+    const bh = (b.v / vMax) * volH;
+    ctx.fillStyle = up ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)';
+    ctx.fillRect(x - candleW / 2, volTop + volH - bh, candleW, bh);
+  });
+
+  // Horizontal level lines
+  function drawLevel(price, color, label) {
+    if (!price) return;
+    const y = priceY(price);
+    ctx.setLineDash([8, 5]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 12px -apple-system,Inter,sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(label + ' $' + price.toFixed(2), W - pad.right - 8, y - 6);
+  }
+
+  if (setup) {
+    drawLevel(setup.trigger || setup.entry_price, '#ffffff', 'Entry');
+    drawLevel(setup.sl, '#ef4444', 'SL');
+    drawLevel(setup.tp, '#4ade80', 'TP');
+  }
+
+  // Date labels
+  ctx.fillStyle = '#555';
+  ctx.font = '11px -apple-system,Inter,sans-serif';
+  ctx.textAlign = 'center';
+  const labelEvery = Math.max(1, Math.floor(bars.length / 10));
+  bars.forEach((b, i) => {
+    if (i % labelEvery === 0) {
+      ctx.fillText(b.date.slice(5), barX(i), H - pad.bottom + 18);
+    }
+  });
+}
+
+// ── Helpers ──
+function el(id) { return document.getElementById(id); }
+function fmt(n) { return n != null ? Number(n).toFixed(2) : '--'; }
+function formatDate(d) {
+  if (!d) return '--';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+}
+function toast(msg) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
