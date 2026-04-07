@@ -1271,6 +1271,87 @@ async def handle_stats(request: web.Request) -> web.Response:
 
 
 # ---------------------------------------------------------------------------
+# GitHub webhook auto-deploy
+# ---------------------------------------------------------------------------
+
+DEPLOY_SECRET = "sharky-gap-deploy-2026"
+DEPLOY_REPO = "joshlilking/gap-scanner"
+DEPLOY_BRANCH = "main"
+DEPLOY_FILES = {
+    "gap_scanner.py": "gap_scanner.py",
+    "static/gaps.html": os.path.join("static", "gaps.html"),
+}
+
+
+async def handle_github_webhook(request: web.Request) -> web.Response:
+    """POST /deploy -- GitHub webhook. Downloads changed files and restarts."""
+    payload = await request.read()
+
+    # Verify signature
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    if DEPLOY_SECRET:
+        import hashlib, hmac as _hmac
+        expected = _hmac.new(DEPLOY_SECRET.encode(), payload, hashlib.sha256).hexdigest()
+        if not _hmac.compare_digest(f"sha256={expected}", sig):
+            return web.Response(status=403, text="Invalid signature")
+
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return web.Response(status=400, text="Bad JSON")
+
+    ref = data.get("ref", "")
+    if ref != f"refs/heads/{DEPLOY_BRANCH}":
+        return web.json_response({"status": "ignored", "ref": ref})
+
+    pusher = data.get("pusher", {}).get("name", "unknown")
+    commits = data.get("commits", [])
+    log.info("DEPLOY: Push from %s with %d commits", pusher, len(commits))
+
+    # Find changed files
+    changed = set()
+    for commit in commits:
+        changed.update(commit.get("added", []))
+        changed.update(commit.get("modified", []))
+
+    # Download and deploy
+    import urllib.request as _urlreq
+    deployed = []
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    for repo_path, local_path in DEPLOY_FILES.items():
+        if changed and repo_path not in changed:
+            continue
+        target = os.path.join(base_dir, local_path)
+        target_dir = os.path.dirname(target)
+        os.makedirs(target_dir, exist_ok=True)
+        try:
+            url = f"https://raw.githubusercontent.com/{DEPLOY_REPO}/{DEPLOY_BRANCH}/{repo_path}"
+            req = _urlreq.Request(url, headers={"User-Agent": "deploy/1.0"})
+            with _urlreq.urlopen(req, timeout=30) as resp:
+                content = resp.read()
+            with open(target, "wb") as f:
+                f.write(content)
+            deployed.append(repo_path)
+            log.info("DEPLOY: %s -> %s (%d bytes)", repo_path, target, len(content))
+        except Exception as e:
+            log.error("DEPLOY: Failed to download %s: %s", repo_path, e)
+
+    msg = f"Deployed {len(deployed)} files from {pusher}"
+    if deployed:
+        log.info("DEPLOY: %s. Restarting in 2s...", msg)
+        # Schedule restart after response is sent
+        async def _restart():
+            await asyncio.sleep(2)
+            log.info("DEPLOY: Restarting gap scanner...")
+            os._exit(0)  # bot_service.py will restart us
+        asyncio.create_task(_restart())
+    else:
+        msg = "No tracked files changed"
+
+    return web.json_response({"status": "ok", "deployed": deployed, "message": msg})
+
+
+# ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 
@@ -1291,6 +1372,7 @@ def create_app() -> web.Application:
     app.router.add_post("/api/gaps/{symbol}/activate", handle_activate)
     app.router.add_post("/api/gaps/{symbol}/close", handle_close)
     app.router.add_delete("/api/gaps/{symbol}", handle_delete_setup)
+    app.router.add_post("/deploy", handle_github_webhook)
 
     # Serve the main page
     async def handle_index(request):
