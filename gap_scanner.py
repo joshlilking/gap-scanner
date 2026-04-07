@@ -1320,19 +1320,11 @@ async def handle_github_webhook(request: web.Request) -> web.Response:
     commits = data.get("commits", [])
     log.info("DEPLOY: Push from %s with %d commits", pusher, len(commits))
 
-    # Find changed files
-    changed = set()
-    for commit in commits:
-        changed.update(commit.get("added", []))
-        changed.update(commit.get("modified", []))
-
-    # Download and deploy
+    # Download and deploy ALL tracked files on any push to main
     import urllib.request as _urlreq
     deployed = []
     base_dir = os.path.dirname(os.path.abspath(__file__))
     for repo_path, local_path in DEPLOY_FILES.items():
-        if changed and repo_path not in changed:
-            continue
         target = os.path.join(base_dir, local_path)
         target_dir = os.path.dirname(target)
         os.makedirs(target_dir, exist_ok=True)
