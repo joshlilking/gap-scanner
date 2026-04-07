@@ -601,10 +601,11 @@ def _check_gap_unfilled(df, tp_price: float, gap_date_str: str) -> bool:
 
         if row_date <= gap_dt:
             continue
-        # If any candle after the gap has high reaching the TP (pre-gap low), gap is filled
+        # Gap is only filled if a daily CLOSE reaches the TP (pre-gap low)
         try:
-            h = float(row[high_col])
-            if h >= tp_price:
+            close_col = cols.get("close", "Close")
+            c = float(row[close_col])
+            if c >= tp_price:
                 return False
         except (KeyError, TypeError):
             continue
@@ -728,10 +729,16 @@ async def run_scan():
         # Update current price
         setup["current_price"] = round(last_close, 2)
 
+        # Auto-entry: daily close above trigger = market entry at that close
         if last_close > setup["trigger_price"]:
-            if " | Trigger hit" not in (setup.get("notes") or ""):
-                triggered.append(setup)
-            setup["notes"] = (setup.get("notes") or "") + f" | Trigger hit at {last_close:.2f}"
+            setup["status"] = "active"
+            setup["entry_price"] = round(last_close, 2)
+            setup["entry_date"] = today.strftime("%Y-%m-%d")
+            setup["trailing_sl"] = None  # trailing starts fresh from entry
+            setup["notes"] = (setup.get("notes") or "") + f" | Auto-entry at {last_close:.2f}"
+            triggered.append(setup)
+            log.info("AUTO-ENTRY: %s at %.2f (trigger %.2f)", sym, last_close, setup["trigger_price"])
+            continue  # skip expiry check, now active
 
         # Expire old setups
         gap_dt = datetime.strptime(setup["gap_date"], "%Y-%m-%d").date()
@@ -756,9 +763,14 @@ async def run_scan():
         await send_whatsapp("\n".join(lines))
 
     if triggered:
-        lines = [f"TRIGGER HIT on {len(triggered)} setups:"]
+        lines = [f"AUTO-ENTRY on {len(triggered)} trades:"]
         for t in triggered[:5]:
-            lines.append(f"  {t['symbol']} closed above {t['trigger_price']}")
+            lines.append(
+                f"  {t['symbol']} entered at {t['entry_price']} "
+                f"| SL {t['sl_price']} | TP {t['tp_price']}"
+            )
+        if len(triggered) > 5:
+            lines.append(f"  ... and {len(triggered) - 5} more")
         await send_whatsapp("\n".join(lines))
 
     summary = {
