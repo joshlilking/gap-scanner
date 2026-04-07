@@ -195,9 +195,9 @@ input{font-family:inherit;outline:none}
 
 <div class="stats-row" id="statsRow">
   <div class="stat-card"><div class="stat-label">Watching</div><div class="stat-value" id="statWatching">--</div></div>
-  <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" id="statActive">--</div></div>
-  <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value green" id="statWinRate">--%</div></div>
-  <div class="stat-card"><div class="stat-label">Total P&amp;L</div><div class="stat-value" id="statPnl">--</div></div>
+  <div class="stat-card"><div class="stat-label">Triggered</div><div class="stat-value" id="statActive">--</div></div>
+  <div class="stat-card"><div class="stat-label">Filled (TP)</div><div class="stat-value green" id="statFilled">--</div></div>
+  <div class="stat-card"><div class="stat-label">Stopped (SL)</div><div class="stat-value red" id="statStopped">--</div></div>
 </div>
 
 <div class="tabs" id="tabBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -351,14 +351,8 @@ async function loadData() {
       const s = await statsRes.json();
       el('statWatching').textContent = s.watching ?? 0;
       el('statActive').textContent = s.active ?? 0;
-      const wr = s.win_rate_pct ?? s.win_rate ?? 0;
-      const wrEl = el('statWinRate');
-      wrEl.textContent = wr.toFixed(0) + '%';
-      wrEl.className = 'stat-value ' + (wr >= 50 ? 'green' : 'red');
-      const pnl = s.total_pnl_pct ?? s.total_pnl ?? 0;
-      const pnlEl = el('statPnl');
-      pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
-      pnlEl.className = 'stat-value ' + (pnl >= 0 ? 'green' : 'red');
+      el('statFilled').textContent = s.winners ?? 0;
+      el('statStopped').textContent = s.losers ?? 0;
     }
     updateCounts();
     renderCards();
@@ -380,10 +374,8 @@ function renderDemoData() {
   ];
   el('statWatching').textContent = '3';
   el('statActive').textContent = '1';
-  el('statWinRate').textContent = '50%';
-  el('statWinRate').className = 'stat-value green';
-  el('statPnl').textContent = '+2.17%';
-  el('statPnl').className = 'stat-value green';
+  el('statFilled').textContent = '0';
+  el('statStopped').textContent = '0';
   updateCounts();
   renderCards();
 }
@@ -454,11 +446,6 @@ function cardHTML(s) {
   if (s.status === 'active') {
     body += '<hr class="card-divider">';
     body += `<div class="card-row"><span class="card-label">Entry</span><span class="card-val highlight">$${fmt(s.entry_price)} on ${formatDate(s.entry_date)}</span></div>`;
-    if (s.current_price != null && s.entry_price) {
-      const pnl = ((s.current_price - s.entry_price) / s.entry_price * 100);
-      const pnlCls = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-      body += `<div class="card-row"><span class="card-label">Current P&L</span><span class="card-val ${pnlCls}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%</span></div>`;
-    }
     if (s.trailing_sl != null) {
       body += `<div class="card-row"><span class="card-label">Trailing SL</span><span class="card-val" style="color:#facc15">$${fmt(s.trailing_sl)}</span></div>`;
     }
@@ -468,8 +455,8 @@ function cardHTML(s) {
     body += '<hr class="card-divider">';
     body += `<div class="card-row"><span class="card-label">Entry</span><span class="card-val">$${fmt(s.entry_price)}</span></div>`;
     body += `<div class="card-row"><span class="card-label">Exit</span><span class="card-val">$${fmt(s.exit_price)}</span></div>`;
-    const pnlCls = (s.pnl_pct||0) >= 0 ? 'pnl-positive' : 'pnl-negative';
-    body += `<div class="card-row"><span class="card-label">P&L</span><span class="card-val ${pnlCls}">${(s.pnl_pct||0) >= 0 ? '+' : ''}${(s.pnl_pct||0).toFixed(2)}%</span></div>`;
+    const hitTP = s.notes && s.notes.includes('TP hit');
+    body += `<div class="card-row"><span class="card-label">Result</span><span class="card-val ${hitTP ? 'pnl-positive' : 'pnl-negative'}">${hitTP ? 'Filled (TP)' : 'Stopped (SL)'}</span></div>`;
   }
 
   // Actions
@@ -478,7 +465,7 @@ function cardHTML(s) {
     actions += `<span style="color:#888;font-size:12px;margin-left:8px;">Auto-enters on daily close above trigger</span>`;
   }
   if (s.status === 'active') {
-    actions += `<button class="btn btn-danger btn-small" onclick="showCloseInput('${s.symbol}', this)">Close Trade</button>`;
+    actions += `<span style="color:#888;font-size:12px;margin-left:8px;">Auto-exits at TP/SL on daily close</span>`;
   }
 
   return `<div class="card" id="card-${s.symbol}">
