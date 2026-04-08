@@ -416,6 +416,18 @@ def detect_gaps(df, symbol: str, settings: Dict[str, Any]) -> List[Dict[str, Any
     if df is None or len(df) < 3:
         return setups
 
+    # Filter out warrants, rights, units (illiquid derivative securities)
+    # Common patterns: SPAC+W (warrants), SPAC+WS, SPAC+U (units), SPAC+R (rights)
+    sym_upper = symbol.upper()
+    if re.search(r'(WS|WT)$', sym_upper):
+        return setups
+    # Warrants: 5+ char tickers ending in W (e.g. VWAVW, PSPCW)
+    if len(sym_upper) >= 5 and sym_upper.endswith('W'):
+        return setups
+    # Units: 5+ char tickers ending in U (e.g. PSPCU)
+    if len(sym_upper) >= 5 and sym_upper.endswith('U'):
+        return setups
+
     min_gap = settings.get("min_gap_pct", 5.0)
     max_gap = settings.get("max_gap_pct", 50.0)
     min_price = settings.get("min_price", 1.0)
@@ -455,6 +467,12 @@ def detect_gaps(df, symbol: str, settings: Dict[str, Any]) -> List[Dict[str, Any
             post_close = float(post_gap[close_col])
         else:
             post_open = post_high = post_low = post_close = 0.0
+
+        # Skip illiquid/phantom candles where O=H=L=C (zero-volume days)
+        if pre_open == pre_high == pre_low == pre_close:
+            continue
+        if gap_open == gap_high == gap_low == gap_close:
+            continue
 
         # Price filter
         if gap_close < min_price:
